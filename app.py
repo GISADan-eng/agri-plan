@@ -1,0 +1,190 @@
+from flask import Flask, render_template, request, redirect, url_for, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from datetime import date
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///agriplan.db"
+
+db = SQLAlchemy(app)
+
+app.config["SECRET_KEY"] = "Change-this-later"
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    farms = db.relationship("Farm", backref="owner", lazy=True)
+
+
+class Farm(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    location = db.Column(db.String(120), nullable=False)
+    size = db.Column(db.Float, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    crops = db.relationship("Crop", backref="farm", lazy=True)
+    tasks = db.relationship("Task", backref="farm", lazy=True)
+
+class Crop(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    planting_date = db.Column(db.Integer, nullable=False)
+    expected_harvest_date = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String, nullable=True, default="Planned")
+    farm_id = db.Column(db.Integer, db.ForeignKey("farm.id"), nullable=True)
+
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, nullable=False)
+    due_date = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.Integer, nullable=False)
+    farm_id = db.Column(db.Integer, db.ForeignKey("farm.id"), nullable=False)
+    crop_id = db.Column(db.Integer, db.ForeignKey("crop.id"), nullable=True)
+
+
+@app.route("/")
+def home():
+    return "Hello from Agriplan"
+
+@app.route("/about")
+def about():
+    return "AgriPlan helps smallholder farmers in Rwanda manage their farms."
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        name = request.form["name"]
+        email = request.form["email"]
+        password = request.form["password"]
+        if User.query.filter_by(email=email).first():
+            flash("email is already registered")
+            return redirect(url_for("register"))
+        user = User(name=name, email=email, password_hash=generate_password_hash(password))
+        db.session.add(user)
+        db.session.commit()
+        flash("Account created, please log in")
+        return redirect(url_for("login"))
+    return render_template("register.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form["email"]
+        password = request.form["password"]
+
+        user = User.query.filter_by(email=email).first()
+
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for("dashboard"))
+        
+        flash("Wrong email or password")
+        return redirect(url_for("login"))
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    logout_user()
+    flash("You've been logged out")
+    return redirect(url_for("login"))
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    my_farms = Farm.query.filter_by(user_id=current_user.id).all()
+    farm_ids = [f.id for f in my_farms]
+    Crops = Crop.query.filter(Crop.farm_id.in_(farm_ids)).all() if farm_ids else []
+    return render_template("dashboard.html", farms = my_farms, Crops=Crops)
+
+@app.route("/farms")
+@login_required
+def farms():
+    my_farms = Farm.query.filter_by(user_id=current_user.id).all()
+    return render_template("farms.html", farms=my_farms)
+
+
+@app.route("/farms/new", methods=["GET", "POST"])
+@login_required
+def new_farm():
+    if request.method == "POST":
+        farm = Farm(
+            name=request.form["name"],
+            location=request.form["location"],
+            size=float(request.form["size"]),
+            user_id=current_user.id,
+        )
+        db.session.add(farm)
+        db.session.commit()
+        flash("Farm added.")
+        return redirect(url_for("farms"))
+    return render_template("farm_form.html", farm=None)
+
+
+@app.route("/farms/<int:farm_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_farm(farm_id):
+    farm = db.session.get(Farm, farm_id)
+    if farm is None or farm.user_id != current_user.id:
+        flash("Farm not found.")
+        return redirect(url_for("farms"))
+
+    if request.method == "POST":
+        farm.name = request.form["name"]
+        farm.location = request.form["location"]
+        farm.size = float(request.form["size"])
+        db.session.commit()
+        flash("Farm updated.")
+        return redirect(url_for("farms"))
+    return render_template("farm_form.html", farm=farm)
+
+
+CROP_STATUSES = ["planned", "growing", "harvested"]
+
+
+@app.route("/crops")
+@login_required
+def crops():
+    my_farm_ids = [f.id for f in Farm.query.filter_by(user_id=current_user.id)]
+    my_crops = Crop.query.filter(Crop.farm_id.in_(my_farm_ids)).all() if my_farm_ids else []
+    return render_template("crops.html", crops=my_crops)
+
+
+@app.route("/crops/new", methods=["GET", "POST"])
+@login_required
+def new_crop():
+    my_farms = Farm.query.filter_by(user_id=current_user.id).all()
+    if not my_farms:
+        flash("Add a farm first.")
+        return redirect(url_for("new_farm"))
+
+    if request.method == "POST":
+        farm = db.session.get(Farm, int(request.form["farm_id"]))
+        if farm is None or farm.user_id != current_user.id:
+            flash("Farm not found.")
+            return redirect(url_for("crops"))
+        crop = Crop(
+            name=request.form["name"],
+            planting_date=date.fromisoformat(request.form["planting_date"]),
+            expected_harvest_date=date.fromisoformat(request.form["expected_harvest_date"]),
+            status=request.form["status"],
+            farm_id=farm.id,
+        )
+        db.session.add(crop)
+        db.session.commit()
+        flash("Crop added.")
+        return redirect(url_for("crops"))
+    return render_template("crop_form.html", crop=None, farms=my_farms, statuses=CROP_STATUSES)
+
+with app.app_context():
+    db.create_all()
+
+if __name__ == "__main__":
+    app.run(debug=True)

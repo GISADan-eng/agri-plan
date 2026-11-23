@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Edit farm" if farm else "Add farm" }}</h1>
+<form method="POST">
+  <div class="mb-3">
+    <label class="form-label" for="name">Farm name</label>
+    <input class="form-control" id="name" name="name" value="{{ farm.name if farm else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="location">Location (district / sector)</label>
+    <input class="form-control" id="location" name="location" value="{{ farm.location if farm else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="size">Size (hectares)</label>
+    <input class="form-control" type="number" step="0.01" min="0" id="size" name="size" value="{{ farm.size if farm else '' }}" required>
+  </div>
+  <button class="btn btn-success w-100" type="submit">Save</button>
+</form>
+{% endblock %}

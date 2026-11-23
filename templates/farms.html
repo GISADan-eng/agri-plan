@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">My Farms</h1>
+<a class="btn btn-success mb-3" href="{{ url_for('new_farm') }}">Add farm</a>
+{% for farm in farms %}
+  <div class="card mb-2"><div class="card-body">
+    <h2 class="h5">{{ farm.name }}</h2>
+    <p class="mb-1">{{ farm.location }} · {{ farm.size }} ha</p>
+    <a href="{{ url_for('edit_farm', farm_id=farm.id) }}">Edit</a>
+  </div></div>
+{% else %}
+  <p>No farms yet. Add your first one.</p>
+{% endfor %}
+<a href="{{ url_for('dashboard') }}">Back to dashboard</a>
+{% endblock %}

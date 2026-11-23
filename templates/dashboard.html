@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">Welcome, {{ current_user.name }}</h1>
+
+<div class="row text-center mb-3">
+  <div class="col"><div class="card"><div class="card-body">
+    <div class="h2">{{ farms|length }}</div>Farms
+  </div></div></div>
+  <div class="col"><div class="card"><div class="card-body">
+    <div class="h2">{{ crops|length }}</div>Crops
+  </div></div></div>
+</div>
+
+<a class="btn btn-success w-100 mb-2" href="{{ url_for('farms') }}">My farms</a>
+<a class="btn btn-outline-secondary w-100" href="{{ url_for('logout') }}">Log out</a>
+<a class="btn btn-success w-100 mb-2" href="{{ url_for('crops') }}">My crops</a>
+{% endblock %}
