@@ -41,6 +41,7 @@ class Crop(db.Model):
     expected_harvest_date = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String, nullable=True, default="Planned")
     farm_id = db.Column(db.Integer, db.ForeignKey("farm.id"), nullable=True)
+    tasks = db.relationship("Task", backref="crop", lazy=True)
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -198,7 +199,34 @@ def edit_crop(crop_id):
         flash("crop not found.")
         return redirect(url_for("crops"))
 
-    
+    if request.method == "POST":
+        farm = db.session.get(Farm, int(request.form["farm_id"]))
+        if farm is None or farm.user_id != current_user.id:
+            flash("Farm not found.")
+            return redirect(url_for("crops"))
+        crop.name = request.form["name"]
+        crop.planting_date = date.fromisoformat(request.form["planting_date"])
+        crop.expected_harvest_date = date.fromisoformat(request.form["expected_harvest_date"])
+        crop.status = request.form["status"]
+        crop.farm_id = farm.id
+        db.session.commit()
+        flash("Crop updated.")
+        return redirect(url_for("crops"))
+    return render_template("crop_form.html", crop=crop, farms=my_farms(), statuses=CROP_STATUSES)
+
+@app.route("/crops/<int:crop_id>/delete", methods=["POST"])
+@login_required
+def delete_crop(crop_id):
+    crop = db.session.get(Crop, crop_id)
+    if crops is None or crop.farm.user_id != current_user.id:
+        flash("Crop not found.")
+        return redirect(url_for("crops"))
+    Task.query.filter_by(Crop.id).update({"crop_id": None})
+    db.session.delete(crop)
+    db.session.commit()
+    flash("crop deleted.")
+    return redirect(url_for("crops"))
+
 with app.app_context():
     db.create_all()
 
