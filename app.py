@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
-from datetime import date
+from datetime import date, timedelta
+from collections import Counter
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///agriplan.db"
@@ -49,6 +50,12 @@ class Task(db.Model):
     farm_id = db.Column(db.Integer, db.ForeignKey("farm.id"), nullable=False)
     crop_id = db.Column(db.Integer, db.ForeignKey("crop.id"), nullable=True)
 
+def my_farm():
+    return Farm.query.filter_by(user_id=current_user.id).all()
+
+def my_crops():
+    ids= [f.id for f in my_farm()]
+    return Crop.query.filter(Crop.farm_id.in_(ids)).all() if ids else []
 
 @app.route("/")
 def home():
@@ -183,6 +190,15 @@ def new_crop():
         return redirect(url_for("crops"))
     return render_template("crop_form.html", crop=None, farms=my_farms, statuses=CROP_STATUSES)
 
+@app.route("/crops/<int:crop_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_crop(crop_id):
+    crop = db.session.get(Crop, crop_id)
+    if crop is None or crop.farm.user-id != current_user.id:
+        flash("crop not found.")
+        return redirect(url_for("crops"))
+
+    
 with app.app_context():
     db.create_all()
 
