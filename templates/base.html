@@ -8,6 +8,15 @@
 </head>
 <body>
   <div class="container py-4" style="max-width: 480px;">
+    {% if current_user.is_authenticated %}
+    <nav class="d-flex flex-wrap gap-3 mb-3 pb-2 border-bottom">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('farms') }}">Farms</a>
+      <a href="{{ url_for('crops') }}">Crops</a>
+      <a href="{{ url_for('tasks') }}">Tasks</a>
+      <a href="{{ url_for('logout') }}" class="ms-auto">Log out</a>
+    </nav>
+    {% endif %}
     {% with messages = get_flashed_messages() %}
       {% for message in messages %}
         <div class="alert alert-info">{{ message }}</div>
