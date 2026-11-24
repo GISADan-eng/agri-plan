@@ -107,10 +107,16 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    my_farms = Farm.query.filter_by(user_id=current_user.id).all()
-    farm_ids = [f.id for f in my_farms]
-    Crops = Crop.query.filter(Crop.farm_id.in_(farm_ids)).all() if farm_ids else []
-    return render_template("dashboard.html", farms = my_farms, Crops=Crops)
+    farms_ = my_farm()
+    crops_ = my_crops()
+    ids = [f.id for f in farms_]
+    pending = Task.query.filter(Task.farm_id.in_(ids), Task.status == "pending").order_by(Task.due_date).all() if ids else []
+    today = date.today()
+    overdue = [t for t in pending if t.due_date < today]
+    upcoming = [t for t in pending if today <= t.due_date <= today + timedelta(days=7)]
+    return render_template("dashboard.html", farms=farms_, crops=crops_,
+                           crop_counts=Counter(c.status for c in crops_),
+                           overdue=overdue, upcoming=upcoming)
 
 @app.route("/farms")
 @login_required
