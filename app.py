@@ -227,6 +227,89 @@ def delete_crop(crop_id):
     flash("crop deleted.")
     return redirect(url_for("crops"))
 
+def get_my_task(task_id):
+    task = db.session.get(Task, task_id)
+    if task is None or task.farm.user_id != current_user.id:
+        return None
+    return task
+
+
+def apply_task_form(task):
+    farm = db.session.get(Farm, int(request.form["farm_id"]))
+    if farm is None or farm.user_id != current_user.id:
+        return False
+    crop_id = request.form.get("crop_id")
+    crop = db.session.get(Crop, int(crop_id)) if crop_id else None
+    if crop is not None and crop.farm_id != farm.id:
+        return False
+    task.title = request.form["title"]
+    task.due_date = date.fromisoformat(request.form["due_date"])
+    task.farm_id = farm.id
+    task.crop_id = crop.id if crop else None
+    return True
+
+
+@app.route("/tasks")
+@login_required
+def tasks():
+    ids = [f.id for f in my_farms()]
+    my_tasks = Task.query.filter(Task.farm_id.in_(ids)).order_by(Task.due_date).all() if ids else []
+    return render_template("tasks.html", tasks=my_tasks, today=date.today())
+
+
+@app.route("/tasks/new", methods=["GET", "POST"])
+@login_required
+def new_task():
+    if not my_farms():
+        flash("Add a farm first.")
+        return redirect(url_for("new_farm"))
+    if request.method == "POST":
+        task = Task()
+        if apply_task_form(task):
+            db.session.add(task)
+            db.session.commit()
+            flash("Task added.")
+            return redirect(url_for("tasks"))
+        flash("Invalid farm or crop.")
+    return render_template("task_form.html", task=None, farms=my_farms(), crops=my_crops())
+
+
+@app.route("/tasks/<int:task_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_task(task_id):
+    task = get_my_task(task_id)
+    if task is None:
+        flash("Task not found.")
+        return redirect(url_for("tasks"))
+    if request.method == "POST":
+        if apply_task_form(task):
+            db.session.commit()
+            flash("Task updated.")
+            return redirect(url_for("tasks"))
+        flash("Invalid farm or crop.")
+    return render_template("task_form.html", task=task, farms=my_farms(), crops=my_crops())
+
+
+@app.route("/tasks/<int:task_id>/toggle", methods=["POST"])
+@login_required
+def toggle_task(task_id):
+    task = get_my_task(task_id)
+    if task:
+        task.status = "pending" if task.status == "done" else "done"
+        db.session.commit()
+    return redirect(url_for("tasks"))
+
+
+@app.route("/tasks/<int:task_id>/delete", methods=["POST"])
+@login_required
+def delete_task(task_id):
+    task = get_my_task(task_id)
+    if task:
+        db.session.delete(task)
+        db.session.commit()
+        flash("Task deleted.")
+    return redirect(url_for("tasks"))
+
 with app.app_context():
     db.create_all()
 
