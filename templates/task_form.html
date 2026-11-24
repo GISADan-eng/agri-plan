@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">{{ "Edit task" if task else "Add task" }}</h1>
+<form method="POST">
+  <div class="mb-3">
+    <label class="form-label" for="title">Task</label>
+    <input class="form-control" id="title" name="title" value="{{ task.title if task else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="due_date">Due date</label>
+    <input class="form-control" type="date" id="due_date" name="due_date" value="{{ task.due_date if task else '' }}" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="farm_id">Farm</label>
+    <select class="form-select" id="farm_id" name="farm_id" required>
+      {% for f in farms %}
+        <option value="{{ f.id }}" {{ "selected" if task and task.farm_id == f.id }}>{{ f.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="crop_id">Crop (optional)</label>
+    <select class="form-select" id="crop_id" name="crop_id">
+      <option value="">No specific crop</option>
+      {% for c in crops %}
+        <option value="{{ c.id }}" {{ "selected" if task and task.crop_id == c.id }}>{{ c.name }} ({{ c.farm.name }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-success w-100" type="submit">Save</button>
+</form>
+{% endblock %}
